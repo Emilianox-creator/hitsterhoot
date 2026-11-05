@@ -1,0 +1,21 @@
+{
+  "name": "hitsterhoot",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/Emilianox-creator/hitsterhoot#readme",
+  "bugs": {
+    "url": "https://github.com/Emilianox-creator/hitsterhoot/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Emilianox-creator/hitsterhoot.git"
+  },
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "ws": "^8.22.1"
+  }
+}

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unirse al juego</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; font-family: system-ui, sans-serif;
+      background: #46178f; color: #fff; display: flex; align-items: center; justify-content: center; padding: 16px;
+    }
+    .card { background: #fff; color: #222; border-radius: 12px; padding: 24px; width: 100%; max-width: 360px; text-align: center; }
+    input {
+      width: 100%; font-size: 20px; padding: 14px; margin-bottom: 12px;
+      border: 2px solid #ccc; border-radius: 8px; text-align: center;
+    }
+    button {
+      width: 100%; font-size: 20px; font-weight: 700; padding: 14px;
+      border: 0; border-radius: 8px; background: #333; color: #fff; cursor: pointer;
+    }
+    #error { color: #c0392b; min-height: 24px; margin-bottom: 8px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="join">
+      <h2>Unirse</h2>
+      <input id="code" inputmode="numeric" maxlength="4" placeholder="Código de sala">
+      <input id="name" maxlength="20" placeholder="Tu nombre">
+      <div id="error"></div>
+      <button id="btn">Entrar</button>
+    </div>
+
+    <div id="lobby" class="hidden">
+      <h2 id="welcome"></h2>
+      <p id="msg">¡Estás dentro! Espera a que el anfitrión inicie.</p>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    let ws;
+
+    function connect(then) {
+      ws = new WebSocket(`${proto}://${location.host}`);
+      ws.onopen = then;
+
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+
+        if (msg.type === 'error') $('error').textContent = msg.message;
+
+        if (msg.type === 'joined') {
+          $('join').classList.add('hidden');
+          $('lobby').classList.remove('hidden');
+          $('welcome').textContent = `Hola, ${msg.name}`;
+        }
+
+        if (msg.type === 'started') $('msg').textContent = '¡El juego comenzó!';
+        if (msg.type === 'room_closed') $('msg').textContent = 'El anfitrión cerró la sala.';
+      };
+
+      ws.onclose = () => {
+        if (!$('lobby').classList.contains('hidden')) $('msg').textContent = 'Desconectado.';
+      };
+    }
+
+    $('btn').onclick = () => {
+      $('error').textContent = '';
+      const code = $('code').value.trim();
+      const name = $('name').value.trim();
+      if (!code || !name) { $('error').textContent = 'Completa código y nombre'; return; }
+
+      const sendJoin = () => ws.send(JSON.stringify({ type: 'join', code, name }));
+      if (ws && ws.readyState === WebSocket.OPEN) sendJoin();
+      else connect(sendJoin);
+    };
+  </script>
+</body>
+</html>

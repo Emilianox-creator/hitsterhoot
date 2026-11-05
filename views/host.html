@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Host</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; font-family: system-ui, sans-serif;
+      background: #46178f; color: #fff; text-align: center; padding: 32px 16px;
+    }
+    h1 { margin: 0 0 8px; }
+    .code {
+      display: inline-block; background: #fff; color: #46178f;
+      font-size: 72px; font-weight: 800; letter-spacing: 12px;
+      padding: 8px 32px; border-radius: 12px; margin: 16px 0;
+    }
+    .url { opacity: .85; font-size: 18px; }
+    .players { margin: 32px auto; max-width: 720px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+    .player { background: rgba(255,255,255,.18); padding: 10px 20px; border-radius: 999px; font-size: 20px; font-weight: 600; }
+    button {
+      font-size: 20px; font-weight: 700; padding: 14px 40px; border: 0; border-radius: 8px;
+      background: #26890c; color: #fff; cursor: pointer;
+    }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    #status { opacity: .8; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Únete al juego</h1>
+  <div class="url" id="url"></div>
+  <div class="code" id="code">····</div>
+
+  <div>Jugadores: <strong id="count">0</strong></div>
+  <div class="players" id="players"></div>
+
+  <button id="start" disabled>Empezar</button>
+  <div id="status">Conectando…</div>
+
+  <script>
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${location.host}`);
+
+    const $ = (id) => document.getElementById(id);
+    $('url').textContent = `Entra a ${location.origin}/ e ingresa el código`;
+
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'create_room' }));
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+
+      if (msg.type === 'room_created') {
+        $('code').textContent = msg.code;
+        $('status').textContent = 'Esperando jugadores…';
+      }
+
+      if (msg.type === 'players') {
+        $('count').textContent = msg.players.length;
+        $('players').innerHTML = '';
+        msg.players.forEach((name) => {
+          const div = document.createElement('div');
+          div.className = 'player';
+          div.textContent = name; // textContent evita inyección de HTML
+          $('players').appendChild(div);
+        });
+        $('start').disabled = msg.players.length === 0;
+      }
+    };
+
+    ws.onclose = () => { $('status').textContent = 'Conexión cerrada. Recarga la página.'; };
+
+    $('start').onclick = () => {
+      ws.send(JSON.stringify({ type: 'start' }));
+      $('status').textContent = '¡Juego iniciado!';
+    };
+  </script>
+</body>
+</html>
