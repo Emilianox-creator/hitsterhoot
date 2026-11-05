@@ -6,20 +6,16 @@ import { WebSocketServer } from 'ws'
 const __dirname = import.meta.dirname;
 const PORT = process.env.PORT || 3000;
 
-// Páginas estáticas: / (clientes) y /host (anfitrión)
-const pages = {
-  '/': './views/client.html',
-  '/host': './views/host.html',
-};
 
 const server = http.createServer((req, res) => {
   const urlPath = req.url.split('?')[0];
 
   // 1. Manejar páginas principales
   const pages = {
-    '/': './views/client.html',
-    '/host': './views/host.html',
+    '/': '../app/views/client.html',
+    '/host': '../app/views/host.html',
   };
+  
 
   const file = pages[urlPath];
   if (file) {
@@ -35,7 +31,7 @@ const server = http.createServer((req, res) => {
 
   // 2. Manejar archivos estáticos (CSS, JS, imágenes en /public)
   if (urlPath.startsWith('/public/')) {
-    const filePath = path.join(__dirname, urlPath);
+    const filePath = path.join(__dirname, '..', 'app', urlPath);
     
     // Validar extensión para el Content-Type correcto
     const ext = path.extname(filePath);
