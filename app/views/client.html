@@ -5,6 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Rebobina · Unirse</title>
   <link rel="stylesheet" href="/public/styles/theme.css">
+  <style>
+    .timer{font:400 64px/1 var(--d);color:var(--pink);margin:0}
+    .timer.low{color:#b4133f}
+    .bar{height:12px;border:3px solid var(--deep);border-radius:99px;overflow:hidden;margin:10px 0 18px}
+    .bar>i{display:block;height:100%;background:var(--mint);transform-origin:left}
+    .yearbox{font:400 78px/1 var(--d);color:var(--deep);text-shadow:4px 4px 0 var(--sun);margin:6px 0 14px}
+    .yearlabel{font-weight:800;opacity:.7}
+    input[type=range]{width:100%;accent-color:var(--pink);height:36px}
+    .stepper{display:flex;gap:8px;justify-content:center;margin-top:6px}
+    .mini{font:800 18px var(--b);flex:1;padding:10px 0;border:3px solid var(--deep);border-radius:12px;background:var(--sun);color:var(--deep);cursor:pointer}
+    .mini:active{background:var(--mint)}
+    .pts{font:400 44px var(--d);color:var(--pink);margin-top:4px}
+    .lb{list-style:none;margin:0;padding:0;text-align:left}
+    .lb li{display:flex;gap:10px;padding:9px 4px;border-bottom:2px dashed rgba(7,26,23,.2);font-weight:800}
+    .lb li:last-child{border:0}.lb .pos{font:400 20px var(--d);color:var(--pink);width:30px}
+    .lb .nm{flex:1}.lb .me{background:rgba(255,228,94,.5);border-radius:8px}
+  </style>
 </head>
 <body>
   <header class="top">
@@ -29,10 +46,41 @@
       <p id="msg">Estás dentro. Espera a que el anfitrión inicie la partida.</p>
     </div>
 
-    <div class="hidden" id="game">
+    <div class="hidden" id="game" style="max-width:420px;margin:0 auto;text-align:center">
       <div class="status" id="status"></div>
-      <div style="display:flex;justify-content:center;margin-bottom:22px" id="mystery"></div>
-      <div class="line" id="line"></div>
+
+      <div class="panel hidden" id="guessing">
+        <div class="timer" id="timer">20</div>
+        <div class="bar"><i id="bar"></i></div>
+        <div class="yearbox" id="yearbig">2000</div>
+        <input type="range" id="slider" step="1">
+        <div class="stepper">
+          <button class="mini" data-d="-10">−10</button><button class="mini" data-d="-1">−1</button>
+          <button class="mini" data-d="1">+1</button><button class="mini" data-d="10">+10</button>
+        </div>
+        <button class="btn" id="lock" style="margin-top:14px">Enviar respuesta</button>
+      </div>
+
+      <div class="panel hidden" id="waiting">
+        <div class="vinyl big" style="margin:0 auto 12px"></div>
+        <h2 id="waittitle">Respuesta enviada</h2>
+        <p id="waitmsg">Esperando a los demás…</p>
+      </div>
+
+      <div class="panel hidden" id="result">
+        <div class="yearlabel">Fue en</div>
+        <div class="yearbox" id="answer"></div>
+        <p id="songinfo" style="margin:4px 0 14px"></p>
+        <div id="yourguess" style="font-weight:800"></div>
+        <div class="pts" id="pts"></div>
+        <div id="rank" style="margin-top:8px;font-weight:600"></div>
+        <p id="nextmsg" style="opacity:.7;margin:14px 0 0"></p>
+      </div>
+
+      <div class="panel hidden" id="final">
+        <h2 id="finaltitle"></h2>
+        <ol class="lb" id="finalboard"></ol>
+      </div>
     </div>
   </main>
 
@@ -42,7 +90,7 @@
       <span>1950</span><span>1960</span><span>1970</span><span>1980</span><span>1990</span><span>2000</span><span>2010</span><span>2020</span>
     </div></div>
     <div class="needle"></div>
-    <p>Rebobina: pon cada canción en su lugar de la línea de tiempo.</p>
+    <p>Adivina el año de la canción: entre más cerca, más puntos.</p>
   </footer>
 
   <script>
@@ -51,25 +99,67 @@
     let ws, me = '';
 
     const show = (id) => ['join', 'lobby', 'game'].forEach((k) => $(k).classList.toggle('hidden', k !== id));
-    const hue = (y) => `hsl(${(y - 1950) * 4.5} 85% 62%)`;
-    const sleeve = (x) => `<div class="sleeve" style="--c:${hue(x.year)}"><span>${x.name}</span><strong>${x.year}</strong></div>`;
-    const slot = (i) => `<button class="slot" data-i="${i}">Va aquí</button>`;
+    const panel = (id) => ['guessing', 'waiting', 'result', 'final'].forEach((k) => $(k).classList.toggle('hidden', k !== id));
+    const esc = (t) => Object.assign(document.createElement('i'), { textContent: t }).innerHTML;
 
-    function render(s) {
-      show('game');
-      const mine = s.turn === me, placing = s.phase === 'placing';
-      const tl = s.players.find((p) => p.name === me)?.timeline || [];
+    let ticker = null, guess = 2000, locked = false;
+    const slider = $('slider');
 
-      $('status').textContent =
-        s.phase === 'over' ? `¡Ganó ${s.winner || 'nadie'}!` :
-        placing ? (mine ? '¡Tu turno! ¿Dónde va?' : `Turno de ${s.turn}`) :
-        `${s.result.name} ${s.result.correct ? 'acertó' : 'falló'}`;
+    function setGuess(y) {
+      guess = Math.min(Number(slider.max), Math.max(Number(slider.min), y));
+      slider.value = guess;
+      $('yearbig').textContent = guess;
+    }
+    slider.oninput = () => setGuess(Number(slider.value));
+    document.querySelector('.stepper').onclick = (e) => {
+      const b = e.target.closest('.mini');
+      if (b && !locked) setGuess(guess + Number(b.dataset.d));
+    };
 
-      $('mystery').innerHTML = `<div class="sleeve mystery" style="--c:${placing ? 'var(--paper)' : hue(s.song.year)}">
-        <span>${s.song.name}</span><strong>${placing ? '????' : s.song.year}</strong></div>`;
+    function countdown(seconds) {
+      clearInterval(ticker);
+      const t0 = performance.now(), total = seconds * 1000;
+      const tick = () => {
+        const left = Math.max(0, total - (performance.now() - t0));
+        $('timer').textContent = Math.ceil(left / 1000);
+        $('timer').classList.toggle('low', left <= 5000);
+        $('bar').style.transform = `scaleX(${left / total})`;
+        if (left <= 0) clearInterval(ticker);
+      };
+      tick();
+      ticker = setInterval(tick, 100);
+    }
 
-      const canPlace = mine && placing;
-      $('line').innerHTML = tl.map((x, i) => (canPlace ? slot(i) : '') + sleeve(x)).join('') + (canPlace ? slot(tl.length) : '');
+    function startRound(m) {
+      locked = false;
+      slider.min = m.min; slider.max = m.max;
+      setGuess(1990);
+      $('lock').disabled = false;
+      $('status').textContent = `Ronda ${m.round} de ${m.total}`;
+      panel('guessing');
+      countdown(m.seconds);
+    }
+
+    function endRound(m) {
+      clearInterval(ticker);
+      $('status').textContent = `Ronda ${m.round} de ${m.total}`;
+      $('answer').textContent = m.year;
+      $('songinfo').innerHTML = `<strong>${esc(m.song.name)}</strong><br>${esc(m.song.artist)}`;
+      $('yourguess').textContent = m.guess === null ? 'No contestaste a tiempo' : `Tu respuesta: ${m.guess} (${m.guess === m.year ? '¡exacto!' : `${Math.abs(m.guess - m.year)} ${Math.abs(m.guess - m.year) === 1 ? 'año' : 'años'} de diferencia`})`;
+      $('pts').textContent = `+${m.points}`;
+      $('rank').textContent = `Llevas ${m.score} puntos · lugar ${m.rank}`;
+      $('nextmsg').textContent = m.last ? 'Esperando el resultado final…' : 'Prepárate, viene la siguiente canción…';
+      panel('result');
+    }
+
+    function finish(m) {
+      clearInterval(ticker);
+      $('status').textContent = '¡Se acabó la partida!';
+      const board = m.leaderboard;
+      const mine = board.findIndex((p) => p.name === me) + 1;
+      $('finaltitle').textContent = mine === 1 ? '¡Ganaste! 🎉' : `Quedaste en el lugar ${mine}`;
+      $('finalboard').innerHTML = board.map((p, i) => `<li class="${p.name === me ? 'me' : ''}"><span class="pos">${i + 1}</span><span class="nm">${esc(p.name)}</span><span>${p.score}</span></li>`).join('');
+      panel('final');
     }
 
     function connect(then) {
@@ -89,8 +179,15 @@
           $('hdr-code').classList.remove('hidden');
         }
 
-        if (msg.type === 'started') $('msg').textContent = 'Empezó el juego.';
-        if (msg.type === 'state') render(msg);
+        if (msg.type === 'started') { $('msg').textContent = 'Empezó el juego. ¡Prepárate!'; }
+        if (msg.type === 'round_start') { show('game'); startRound(msg); }
+        if (msg.type === 'guess_ok') {
+          locked = true;
+          $('waitmsg').textContent = `Tu respuesta: ${msg.year}. Esperando a los demás…`;
+          panel('waiting');
+        }
+        if (msg.type === 'round_end') { show('game'); endRound(msg); }
+        if (msg.type === 'game_over') finish(msg);
         if (msg.type === 'room_closed') {
           show('lobby');
           $('msg').textContent = 'El anfitrión cerró la sala.';
@@ -104,9 +201,10 @@
       };
     }
 
-    $('line').onclick = (e) => {
-      const b = e.target.closest('.slot');
-      if (b) ws.send(JSON.stringify({ type: 'place', index: Number(b.dataset.i) }));
+    $('lock').onclick = () => {
+      if (locked) return;
+      $('lock').disabled = true;
+      ws.send(JSON.stringify({ type: 'guess', year: guess }));
     };
 
     $('btn').onclick = () => {

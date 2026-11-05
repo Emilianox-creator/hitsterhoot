@@ -12,13 +12,27 @@
     .pill{padding:8px 20px;border-radius:99px;font-weight:800;font-size:20px;background:var(--mint);color:var(--deep);border:3px solid var(--deep)}
     .pill:nth-child(3n+1){background:var(--pink)}.pill:nth-child(3n+2){background:var(--sun)}
     .stage{display:flex;gap:28px;align-items:center;justify-content:center;flex-wrap:wrap;margin-bottom:28px}
-    .row{padding:12px 14px;margin-bottom:12px;border:3px solid rgba(255,246,227,.2);border-radius:18px}
-    .row.on{border-color:var(--sun);background:rgba(255,228,94,.08)}
-    .row h3{font-size:20px;display:flex;justify-content:space-between;margin:0 0 8px}
-    .row small{font:600 16px var(--b);opacity:.8}
-    .strip{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px}
-    .strip .sleeve{width:112px;min-height:96px;font-size:12px}.strip .sleeve strong{font-size:26px}
     .ok{display:block;margin:0 auto}
+    .timer{font:400 clamp(72px,18vw,150px)/1 var(--d);color:var(--sun);text-shadow:6px 6px 0 var(--pink);margin:0}
+    .timer.low{color:var(--pink);text-shadow:6px 6px 0 var(--sun)}
+    .bar{height:14px;border:3px solid var(--paper);border-radius:99px;overflow:hidden;max-width:420px;margin:12px auto}
+    .bar>i{display:block;height:100%;width:100%;background:var(--mint);transform-origin:left}
+    .center{text-align:center}
+    .card{background:var(--paper);color:var(--deep);border-radius:22px;padding:18px 22px;box-shadow:8px 8px 0 var(--pink);max-width:640px;margin:0 auto 24px}
+    .card h3{font-size:22px}
+    .lb{list-style:none;margin:0;padding:0}
+    .lb li{display:flex;align-items:center;gap:12px;padding:10px 6px;border-bottom:2px dashed rgba(7,26,23,.2);font-weight:800;font-size:20px}
+    .lb li:last-child{border:0}
+    .lb .pos{font:400 24px var(--d);width:34px;color:var(--pink)}
+    .lb .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .lb .sc{font:400 22px var(--d)}
+    .lb .gain{font:600 15px var(--b);color:#0a8f6a;min-width:64px;text-align:right}
+    .lb .detail{font:600 14px var(--b);opacity:.7}
+    .lb li:first-child .nm::before{content:'👑 '}
+    .reveal{max-width:340px;margin:0 auto}
+    .reveal .sleeve{max-width:340px;width:100%}
+    .reveal .sleeve strong{font-size:54px}
+    .sub{opacity:.8;margin-top:10px}
   </style>
 </head>
 <body>
@@ -40,14 +54,44 @@
       <div id="status" style="margin-top:16px;opacity:.8">Conectando…</div>
     </section>
 
-    <section id="game" class="hidden">
+    <section id="game" class="hidden center">
       <div class="status" id="gstatus"></div>
-      <div class="stage">
-        <div class="vinyl big" id="disc"></div>
-        <div id="mystery" style="width:100%;max-width:300px"></div>
+
+      <div id="playing" class="hidden">
+        <div class="stage">
+          <div class="vinyl big" id="disc"></div>
+          <div>
+            <div class="timer" id="timer">20</div>
+            <div class="bar"><i id="bar"></i></div>
+            <div class="sub"><span id="answered">0</span> de <span id="ptotal">0</span> ya respondieron</div>
+          </div>
+        </div>
+        <div class="sleeve mystery" style="--c:var(--paper);margin:0 auto"><span>Canción misteriosa</span><strong>????</strong></div>
       </div>
-      <div id="board"></div>
-      <button class="btn ok hidden" id="again" style="max-width:340px;margin-top:16px">Nueva partida</button>
+
+      <div id="loading" class="hidden">
+        <div class="vinyl big" style="margin:0 auto"></div>
+        <p id="loadmsg">Buscando canción…</p>
+        <button class="btn ok hidden" id="retry" style="max-width:340px">Reintentar</button>
+        <button class="btn ok hidden" id="tap" style="max-width:340px">▶ Tocar para reproducir</button>
+      </div>
+
+      <div id="result" class="hidden">
+        <div class="reveal" id="reveal"></div>
+        <div class="card" style="margin-top:28px;text-align:left">
+          <h3>Tabla de posiciones</h3>
+          <ol class="lb" id="board"></ol>
+        </div>
+        <button class="btn ok" id="next" style="max-width:340px"></button>
+      </div>
+
+      <div id="final" class="hidden">
+        <div class="card" style="text-align:left">
+          <h3 id="winner"></h3>
+          <ol class="lb" id="finalboard"></ol>
+        </div>
+        <button class="btn ok" id="again" style="max-width:340px">Jugar de nuevo</button>
+      </div>
     </section>
   </main>
 
@@ -57,41 +101,140 @@
       <span>1950</span><span>1960</span><span>1970</span><span>1980</span><span>1990</span><span>2000</span><span>2010</span><span>2020</span>
     </div></div>
     <div class="needle"></div>
-    <p>® Loera Labs</p>
+    <p>Adivina el año de la canción: entre más cerca, más puntos.</p>
   </footer>
 
   <script>
+    // La API de canciones corre en otro puerto (server/api.js). Se puede cambiar con ?api=http://host:4000
+    const API = new URLSearchParams(location.search).get('api') || `${location.protocol}//${location.hostname}:4000`;
+
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}`);
 
     const $ = (id) => document.getElementById(id);
     const esc = (t) => Object.assign(document.createElement('i'), { textContent: t }).innerHTML;
-    const hue = (y) => `hsl(${(y - 1950) * 4.5} 85% 62%)`;
-    const sleeve = (x) => `<div class="sleeve" style="--c:${hue(x.year)}"><span>${x.name}</span><strong>${x.year}</strong></div>`;
     $('url').textContent = `Abre ${location.origin}/ e ingresa el código`;
 
-    function render(s) {
-      $('lobby').classList.add('hidden');
-      $('game').classList.remove('hidden');
-      const placing = s.phase === 'placing', over = s.phase === 'over';
+    const audio = new Audio();
+    const played = new Set();      // para no repetir canciones en una partida
+    let pending = null;            // canción lista pero que el navegador no dejó reproducir
+    let ticker = null, nextTimer = null;
+    const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
 
-      $('gstatus').textContent =
-        over ? `¡Ganó ${s.winner || 'nadie'}!` :
-        placing ? `Turno de ${s.turn}` :
-        `${s.result.name} ${s.result.correct ? 'acertó' : 'falló'}`;
+    const panels = ['playing', 'loading', 'result', 'final'];
+    const showPanel = (id) => panels.forEach((p) => $(p).classList.toggle('hidden', p !== id));
+    const send = (m) => ws.send(JSON.stringify(m));
 
-      $('disc').classList.toggle('paused', !placing);
-      $('mystery').innerHTML = `<div class="sleeve mystery" style="--c:${placing ? 'var(--paper)' : hue(s.song.year)}">
-        <span>${s.song.name}</span><strong>${placing ? '????' : s.song.year}</strong></div>`;
+    function stopClocks() { clearInterval(ticker); clearTimeout(nextTimer); }
 
-      $('board').innerHTML = s.players.map((p) => `<div class="row ${p.name === s.turn && !over ? 'on' : ''}">
-        <h3><span>${esc(p.name)}</span><small>${p.timeline.length} de ${s.goal}</small></h3>
-        <div class="strip">${p.timeline.map(sleeve).join('')}</div></div>`).join('');
-
-      $('again').classList.toggle('hidden', !over);
+    // ----- Ronda: pedir canción -> reproducir -> abrir ventana de respuestas -----
+    async function fetchTrack() {
+      for (let i = 0; i < 4; i++) {
+        const res = await fetch(`${API}/random-song`);
+        const track = await res.json();
+        if (!res.ok || track.error) throw new Error(track.error || `HTTP ${res.status}`);
+        if (!played.has(track.id)) return track;
+      }
+      throw new Error('Solo salieron canciones repetidas');
     }
 
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'create_room' }));
+    function openRound(track) {
+      played.add(track.id);
+      pending = null;
+      send({ type: 'round', song: { name: track.name, artist: track.artist, year: track.year } });
+    }
+
+    async function nextRound(round) {
+      stopClocks();
+      showPanel('loading');
+      $('loadmsg').textContent = 'Buscando canción…';
+      $('retry').classList.add('hidden');
+      $('tap').classList.add('hidden');
+      try {
+        const track = await fetchTrack();
+        audio.src = track.previewUrl;
+        try {
+          await audio.play();
+          openRound(track);              // el reloj de 20 s arranca cuando ya suena
+        } catch {
+          pending = track;               // autoplay bloqueado: pedir un toque
+          $('loadmsg').textContent = 'El navegador bloqueó el audio';
+          $('tap').classList.remove('hidden');
+        }
+      } catch (err) {
+        $('loadmsg').textContent = `No se pudo obtener la canción: ${err.message}`;
+        $('retry').classList.remove('hidden');
+      }
+    }
+
+    $('retry').onclick = () => nextRound();
+    $('tap').onclick = async () => {
+      if (!pending) return;
+      try { await audio.play(); openRound(pending); } catch (e) { $('loadmsg').textContent = 'No se pudo reproducir: ' + e.message; }
+    };
+
+    // ----- Cuenta regresiva (usa los segundos que manda el servidor, sin depender de relojes) -----
+    function countdown(seconds) {
+      stopClocks();
+      const t0 = performance.now(), total = seconds * 1000;
+      const tick = () => {
+        const left = Math.max(0, total - (performance.now() - t0));
+        $('timer').textContent = Math.ceil(left / 1000);
+        $('timer').classList.toggle('low', left <= 5000);
+        $('bar').style.transform = `scaleX(${left / total})`;
+        if (left <= 0) clearInterval(ticker);
+      };
+      tick();
+      ticker = setInterval(tick, 100);
+    }
+
+    // ----- Pantallas de resultados -----
+    function board(el, list, gains = {}) {
+      el.innerHTML = list.map((p, i) => `<li>
+        <span class="pos">${i + 1}</span><span class="nm">${esc(p.name)}</span>
+        ${gains[p.name] !== undefined ? `<span class="gain">+${gains[p.name]}</span>` : ''}
+        <span class="sc">${p.score}</span></li>`).join('');
+    }
+
+    function showResult(m) {
+      audio.pause();
+      stopClocks();
+      $('disc').classList.add('paused');
+      showPanel('result');
+      $('gstatus').textContent = `Ronda ${m.round} de ${m.total}`;
+      const hue = `hsl(${(m.song.year - 1950) * 4.5} 85% 62%)`;
+      $('reveal').innerHTML = `<div class="sleeve" style="--c:${hue}"><span>${esc(m.song.name)}<br>${esc(m.song.artist)}</span><strong>${m.song.year}</strong></div>`;
+      const gains = Object.fromEntries(m.results.map((r) => [r.name, r.points]));
+      board($('board'), m.leaderboard, gains);
+
+      // En la última ronda el botón lleva al resultado final; en las demás, a la siguiente canción
+      const advance = m.last ? () => send({ type: 'show_final' }) : nextRound;
+      const text = m.last ? 'Ver resultado final' : 'Siguiente ronda';
+      advanceFn = advance;
+      let left = m.last ? 12 : 8;
+      const label = () => { $('next').textContent = `${text} (${left})`; };
+      label();
+      nextTimer = setInterval(() => {
+        left -= 1;
+        if (left <= 0) { clearInterval(nextTimer); advance(); } else label();
+      }, 1000);
+    }
+
+    let advanceFn = null;
+    $('next').onclick = () => { clearInterval(nextTimer); advanceFn && advanceFn(); };
+
+    function showFinal(m) {
+      stopClocks();
+      audio.pause();
+      showPanel('final');
+      $('gstatus').textContent = '¡Se acabó la partida!';
+      const top = m.leaderboard.filter((p) => p.score === m.leaderboard[0]?.score);
+      $('winner').textContent = top.length > 1 ? `Empate: ${top.map((p) => p.name).join(', ')}` : `¡Ganó ${top[0]?.name || 'nadie'}!`;
+      board($('finalboard'), m.leaderboard);
+    }
+
+    // ----- WebSocket -----
+    ws.onopen = () => send({ type: 'create_room' });
 
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
@@ -107,15 +250,42 @@
         $('count').textContent = msg.players.length;
         $('players').innerHTML = msg.players.map((n) => `<div class="pill">${esc(n)}</div>`).join('');
         $('start').disabled = msg.players.length === 0;
+        $('ptotal').textContent = msg.players.length;
       }
 
-      if (msg.type === 'state') render(msg);
+      if (msg.type === 'game_started') {
+        $('lobby').classList.add('hidden');
+        $('game').classList.remove('hidden');
+        played.clear();
+        nextRound();
+      }
+
+      if (msg.type === 'round_started') {
+        showPanel('playing');
+        $('gstatus').textContent = `Ronda ${msg.round} de ${msg.total} · ¿De qué año es?`;
+        $('disc').classList.remove('paused');
+        $('answered').textContent = '0';
+        countdown(msg.seconds);
+      }
+
+      if (msg.type === 'guess_count') {
+        $('answered').textContent = msg.answered;
+        $('ptotal').textContent = msg.total;
+      }
+
+      if (msg.type === 'round_result') showResult(msg);
+      if (msg.type === 'game_over') showFinal(msg);
     };
 
-    ws.onclose = () => { $('status').textContent = 'Conexión cerrada. Recarga la página.'; };
+    ws.onclose = () => { stopClocks(); audio.pause(); $('status').textContent = 'Conexión cerrada. Recarga la página.'; };
 
-    $('start').onclick = () => ws.send(JSON.stringify({ type: 'start' }));
-    $('again').onclick = () => location.reload();
+    $('start').onclick = () => {
+      // Desbloquea el audio con este clic para que las rondas siguientes puedan sonar solas
+      audio.src = SILENCE;
+      audio.play().catch(() => {});
+      send({ type: 'start' });
+    };
+    $('again').onclick = () => { audio.src = SILENCE; audio.play().catch(() => {}); send({ type: 'start' }); };
   </script>
 </body>
 </html>
