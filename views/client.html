@@ -3,46 +3,74 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Unirse al juego</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; min-height: 100vh; font-family: system-ui, sans-serif;
-      background: #46178f; color: #fff; display: flex; align-items: center; justify-content: center; padding: 16px;
-    }
-    .card { background: #fff; color: #222; border-radius: 12px; padding: 24px; width: 100%; max-width: 360px; text-align: center; }
-    input {
-      width: 100%; font-size: 20px; padding: 14px; margin-bottom: 12px;
-      border: 2px solid #ccc; border-radius: 8px; text-align: center;
-    }
-    button {
-      width: 100%; font-size: 20px; font-weight: 700; padding: 14px;
-      border: 0; border-radius: 8px; background: #333; color: #fff; cursor: pointer;
-    }
-    #error { color: #c0392b; min-height: 24px; margin-bottom: 8px; }
-    .hidden { display: none; }
-  </style>
+  <title>Rebobina · Unirse</title>
+  <link rel="stylesheet" href="/public/styles/theme.css">
 </head>
 <body>
-  <div class="card">
-    <div id="join">
-      <h2>Unirse</h2>
-      <input id="code" inputmode="numeric" maxlength="4" placeholder="Código de sala">
-      <input id="name" maxlength="20" placeholder="Tu nombre">
-      <div id="error"></div>
-      <button id="btn">Entrar</button>
+  <header class="top">
+    <div class="vinyl"></div>
+    <div class="brand">HITSTERHOOT<b>!</b></div>
+    <div class="eq"><i></i><i></i><i></i><i></i></div>
+    <span class="tag hidden" id="hdr-code"></span>
+  </header>
+
+  <main>
+    <div class="panel" id="join" style="max-width:380px;margin:0 auto">
+      <h2>¿En qué año sonó?</h2>
+      <input class="in" id="code" inputmode="numeric" maxlength="4" placeholder="Código de sala">
+      <input class="in" id="name" maxlength="20" placeholder="Tu nombre">
+      <div class="err" id="error"></div>
+      <button class="btn" id="btn">Entrar a la sala</button>
     </div>
 
-    <div id="lobby" class="hidden">
+    <div class="panel hidden" id="lobby" style="max-width:380px;margin:0 auto">
+      <div class="vinyl big" style="margin:0 auto 16px"></div>
       <h2 id="welcome"></h2>
-      <p id="msg">¡Estás dentro! Espera a que el anfitrión inicie.</p>
+      <p id="msg">Estás dentro. Espera a que el anfitrión inicie la partida.</p>
     </div>
-  </div>
+
+    <div class="hidden" id="game">
+      <div class="status" id="status"></div>
+      <div style="display:flex;justify-content:center;margin-bottom:22px" id="mystery"></div>
+      <div class="line" id="line"></div>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <div class="ruler"><div class="track">
+      <span>1950</span><span>1960</span><span>1970</span><span>1980</span><span>1990</span><span>2000</span><span>2010</span><span>2020</span>
+      <span>1950</span><span>1960</span><span>1970</span><span>1980</span><span>1990</span><span>2000</span><span>2010</span><span>2020</span>
+    </div></div>
+    <div class="needle"></div>
+    <p>Rebobina: pon cada canción en su lugar de la línea de tiempo.</p>
+  </footer>
 
   <script>
     const $ = (id) => document.getElementById(id);
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    let ws;
+    let ws, me = '';
+
+    const show = (id) => ['join', 'lobby', 'game'].forEach((k) => $(k).classList.toggle('hidden', k !== id));
+    const hue = (y) => `hsl(${(y - 1950) * 4.5} 85% 62%)`;
+    const sleeve = (x) => `<div class="sleeve" style="--c:${hue(x.year)}"><span>${x.name}</span><strong>${x.year}</strong></div>`;
+    const slot = (i) => `<button class="slot" data-i="${i}">Va aquí</button>`;
+
+    function render(s) {
+      show('game');
+      const mine = s.turn === me, placing = s.phase === 'placing';
+      const tl = s.players.find((p) => p.name === me)?.timeline || [];
+
+      $('status').textContent =
+        s.phase === 'over' ? `¡Ganó ${s.winner || 'nadie'}!` :
+        placing ? (mine ? '¡Tu turno! ¿Dónde va?' : `Turno de ${s.turn}`) :
+        `${s.result.name} ${s.result.correct ? 'acertó' : 'falló'}`;
+
+      $('mystery').innerHTML = `<div class="sleeve mystery" style="--c:${placing ? 'var(--paper)' : hue(s.song.year)}">
+        <span>${s.song.name}</span><strong>${placing ? '????' : s.song.year}</strong></div>`;
+
+      const canPlace = mine && placing;
+      $('line').innerHTML = tl.map((x, i) => (canPlace ? slot(i) : '') + sleeve(x)).join('') + (canPlace ? slot(tl.length) : '');
+    }
 
     function connect(then) {
       ws = new WebSocket(`${proto}://${location.host}`);
@@ -54,19 +82,32 @@
         if (msg.type === 'error') $('error').textContent = msg.message;
 
         if (msg.type === 'joined') {
-          $('join').classList.add('hidden');
-          $('lobby').classList.remove('hidden');
+          me = msg.name;
+          show('lobby');
           $('welcome').textContent = `Hola, ${msg.name}`;
+          $('hdr-code').textContent = `Sala ${msg.code}`;
+          $('hdr-code').classList.remove('hidden');
         }
 
-        if (msg.type === 'started') $('msg').textContent = '¡El juego comenzó!';
-        if (msg.type === 'room_closed') $('msg').textContent = 'El anfitrión cerró la sala.';
+        if (msg.type === 'started') $('msg').textContent = 'Empezó el juego.';
+        if (msg.type === 'state') render(msg);
+        if (msg.type === 'room_closed') {
+          show('lobby');
+          $('msg').textContent = 'El anfitrión cerró la sala.';
+        }
       };
 
       ws.onclose = () => {
-        if (!$('lobby').classList.contains('hidden')) $('msg').textContent = 'Desconectado.';
+        if (!$('join').classList.contains('hidden')) return;
+        show('lobby');
+        $('msg').textContent = 'Desconectado. Recarga para volver a entrar.';
       };
     }
+
+    $('line').onclick = (e) => {
+      const b = e.target.closest('.slot');
+      if (b) ws.send(JSON.stringify({ type: 'place', index: Number(b.dataset.i) }));
+    };
 
     $('btn').onclick = () => {
       $('error').textContent = '';

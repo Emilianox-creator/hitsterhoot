@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Bowlby+One&family=Bricolage+Grotesque:wght@400;600;800&display=swap');
+:root{--bg:#0c2e2a;--bg2:#13463e;--deep:#071a17;--paper:#fff6e3;--pink:#ff3d9a;--sun:#ffe45e;--mint:#5af0c8;
+  --d:'Bowlby One',Impact,sans-serif;--b:'Bricolage Grotesque',system-ui,sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--paper);font:400 17px/1.4 var(--b);
+  background-image:radial-gradient(circle at 105% -5%,rgba(255,61,154,.28),transparent 42%),
+  repeating-radial-gradient(circle at -8% 108%,transparent 0 9px,rgba(255,246,227,.05) 9px 10px)}
+main{flex:1;width:100%;max-width:980px;margin:0 auto;padding:28px 16px}
+.hidden{display:none!important}
+h1,h2,h3{font-family:var(--d);font-weight:400;margin:0 0 12px}
+
+/* Header: vinilo giratorio + wordmark + ecualizador */
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:10px 18px;
+  background:rgba(7,26,23,.88);backdrop-filter:blur(8px);border-bottom:3px solid var(--paper)}
+.brand{display:flex;align-items:center;gap:10px;font:400 27px var(--d)}
+.brand b{color:var(--pink);font-weight:400;display:inline-block;transform:rotate(-8deg)}
+.vinyl{width:44px;height:44px;flex:none;border-radius:50%;border:2px solid #000;animation:spin 3s linear infinite;
+  background:conic-gradient(from 20deg,transparent 0 18%,rgba(255,255,255,.2) 25%,transparent 32% 68%,rgba(255,255,255,.2) 75%,transparent 82%),
+  radial-gradient(circle,var(--deep) 0 4%,var(--pink) 5% 24%,#000 25% 28%,transparent 29%),
+  repeating-radial-gradient(circle,#1c1c1c 0 2px,#080808 2px 4px)}
+.vinyl.big{width:150px;height:150px}.paused{animation-play-state:paused}
+@keyframes spin{to{transform:rotate(360deg)}}
+.eq{display:flex;gap:3px;align-items:flex-end;height:24px;margin-left:auto}
+.eq i{width:5px;background:var(--sun);border-radius:2px;animation:eq .9s ease-in-out infinite alternate}
+.eq i:nth-child(2){animation-delay:-.3s;background:var(--pink)}.eq i:nth-child(3){animation-delay:-.6s;background:var(--mint)}.eq i:nth-child(4){animation-delay:-.15s}
+@keyframes eq{from{height:4px}to{height:24px}}
+.tag{font-weight:800;padding:4px 12px;border-radius:99px;background:var(--sun);color:var(--deep);transform:rotate(2deg)}
+
+/* Footer: regla de años con aguja de tocadiscos */
+.foot{position:relative;margin-top:24px;background:var(--deep);border-top:3px solid var(--paper);overflow:hidden;text-align:center}
+.ruler{overflow:hidden;padding:18px 0 6px}
+.track{display:flex;width:max-content;font:400 22px var(--d);color:var(--paper);animation:slide 40s linear infinite;
+  background:repeating-linear-gradient(90deg,var(--mint) 0 2px,transparent 2px 16px) bottom/100% 10px no-repeat;padding-bottom:16px}
+.track span{padding-right:60px;white-space:nowrap}
+.track span:nth-child(odd){color:var(--sun)}
+@keyframes slide{to{transform:translateX(-50%)}}
+.needle{position:absolute;left:50%;top:0;bottom:30px;width:3px;background:var(--pink);box-shadow:0 0 12px var(--pink)}
+.needle::before{content:'';position:absolute;top:0;left:-6px;border:7px solid transparent;border-top-color:var(--pink)}
+.foot p{margin:0;padding:6px 12px 14px;font-size:14px;opacity:.75}
+
+/* Controles */
+.panel{background:var(--paper);color:var(--deep);border-radius:22px;padding:26px;box-shadow:8px 8px 0 var(--pink);text-align:center}
+.in{width:100%;font:600 22px var(--b);padding:14px;margin-bottom:12px;border:3px solid var(--deep);border-radius:14px;
+  background:#fff;color:var(--deep);text-align:center;outline:none}
+.in:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,61,154,.25)}
+.btn{width:100%;font:400 21px var(--d);padding:14px 22px;border:3px solid var(--deep);border-radius:14px;
+  background:var(--pink);color:var(--deep);box-shadow:5px 5px 0 var(--deep);cursor:pointer}
+.btn:active{transform:translate(4px,4px);box-shadow:1px 1px 0 var(--deep)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.err{color:#b4133f;min-height:24px;font-weight:600}
+
+/* Discos (cartas): el color sale de la década */
+.sleeve{--c:var(--sun);display:flex;flex-direction:column;justify-content:space-between;gap:6px;flex:none;
+  width:130px;min-height:120px;padding:10px;background:var(--c);color:var(--deep);border:3px solid var(--deep);
+  border-radius:10px 10px 10px 28px;font-size:13px;font-weight:600;line-height:1.2;box-shadow:4px 4px 0 rgba(0,0,0,.35)}
+.sleeve strong{font:400 32px var(--d)}
+.mystery{width:100%;max-width:300px;min-height:150px;font-size:16px;transform:rotate(-2deg)}
+.mystery strong{font-size:54px}
+.status{font:400 24px var(--d);text-align:center;margin:8px 0 18px}
+.line{display:flex;flex-direction:column;gap:8px;max-width:420px;margin:0 auto}
+.line .sleeve{width:100%;min-height:0;flex-direction:row;align-items:center;font-size:15px}
+.slot{font:800 15px var(--b);padding:12px;border:3px dashed var(--sun);border-radius:12px;background:rgba(255,228,94,.1);color:var(--sun);cursor:pointer}
+.slot:active{background:var(--sun);color:var(--deep)}
+@media (prefers-reduced-motion:reduce){.vinyl,.eq i,.track{animation:none}}

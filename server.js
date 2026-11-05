@@ -13,19 +13,53 @@ const pages = {
 };
 
 const server = http.createServer((req, res) => {
-  const file = pages[req.url.split('?')[0]];
-  if (!file) {
-    res.writeHead(404);
-    return res.end('Not Found');
+  const urlPath = req.url.split('?')[0];
+
+  // 1. Manejar páginas principales
+  const pages = {
+    '/': './views/client.html',
+    '/host': './views/host.html',
+  };
+
+  const file = pages[urlPath];
+  if (file) {
+    return fs.readFile(path.join(__dirname, file), (err, data) => {
+      if (err) {
+        res.writeHead(500);
+        return res.end('Error interno');
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
   }
-  fs.readFile(path.join(__dirname, file), (err, data) => {
-    if (err) {
-      res.writeHead(500);
-      return res.end('Error');
-    }
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(data);
-  });
+
+  // 2. Manejar archivos estáticos (CSS, JS, imágenes en /public)
+  if (urlPath.startsWith('/public/')) {
+    const filePath = path.join(__dirname, urlPath);
+    
+    // Validar extensión para el Content-Type correcto
+    const ext = path.extname(filePath);
+    const mimeTypes = {
+      '.css': 'text/css',
+      '.js': 'application/javascript',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.svg': 'image/svg+xml'
+    };
+
+    return fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404);
+        return res.end('Archivo no encontrado');
+      }
+      res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
+      res.end(data);
+    });
+  }
+
+  // 3. Si no encaja en nada
+  res.writeHead(404);
+  res.end('Not Found');
 });
 
 const wss = new WebSocketServer({ server });
