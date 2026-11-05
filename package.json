@@ -13,9 +13,8 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "ws": "node server/ws-server.js",
-    "api": "node server/api.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "ws": "nodemon server/ws-server.js",
+    "api": "nodemon server/api.js"
   },
   "dependencies": {
     "cors": "^2.8.6",

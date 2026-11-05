@@ -33,6 +33,12 @@
     .reveal .sleeve{max-width:340px;width:100%}
     .reveal .sleeve strong{font-size:54px}
     .sub{opacity:.8;margin-top:10px}
+    .opts{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:8px 0 22px}
+    .opt{font:800 17px var(--b);padding:10px 18px;border-radius:14px;border:3px solid var(--paper);background:transparent;color:var(--paper);cursor:pointer;text-align:left}
+    .opt small{display:block;font:600 13px var(--b);opacity:.75;margin-top:2px;max-width:200px}
+    .opt.sel{background:var(--sun);color:var(--deep);border-color:var(--deep);box-shadow:4px 4px 0 var(--pink)}
+    .opt.round{text-align:center;min-width:64px}
+    .setup h3{font-size:20px;margin:14px 0 0}
   </style>
 </head>
 <body>
@@ -50,6 +56,12 @@
       <div class="code" id="code">····</div>
       <div>Jugadores: <strong id="count">0</strong></div>
       <div class="pills" id="players"></div>
+      <div class="setup">
+        <h3>Estilo de música</h3>
+        <div class="opts" id="sets"><span style="opacity:.7">Cargando sets…</span></div>
+        <h3>Rondas</h3>
+        <div class="opts" id="rounds"></div>
+      </div>
       <button class="btn ok" id="start" style="max-width:340px" disabled>Empezar partida</button>
       <div id="status" style="margin-top:16px;opacity:.8">Conectando…</div>
     </section>
@@ -115,7 +127,48 @@
     const esc = (t) => Object.assign(document.createElement('i'), { textContent: t }).innerHTML;
     $('url').textContent = `Abre ${location.origin}/ e ingresa el código`;
 
+    // ----- Selección de set de música y número de rondas -----
+    const ROUND_OPTIONS = [3, 5, 10, 15];
+    let chosenSet = null, chosenRounds = 5, playerCount = 0, setsLoaded = false;
+
+    const refreshStart = () => { $('start').disabled = !(playerCount > 0 && setsLoaded && chosenSet); };
+
+    function pickIn(container, el) {
+      [...container.children].forEach((c) => c.classList.toggle('sel', c === el));
+    }
+
+    $('rounds').innerHTML = ROUND_OPTIONS.map((n) => `<button class="opt round${n === chosenRounds ? ' sel' : ''}" data-n="${n}">${n}</button>`).join('');
+    $('rounds').onclick = (e) => {
+      const b = e.target.closest('.opt');
+      if (!b) return;
+      chosenRounds = Number(b.dataset.n);
+      pickIn($('rounds'), b);
+    };
+
+    async function loadSets() {
+      try {
+        const res = await fetch(`${API}/sets`);
+        const sets = await res.json();
+        if (!res.ok || !Array.isArray(sets)) throw new Error(sets.error || `HTTP ${res.status}`);
+        $('sets').innerHTML = sets.map((x, i) => `<button class="opt${i === 0 ? ' sel' : ''}" data-id="${esc(x.id)}">${esc(x.label)}<small>${esc(x.desc)}</small></button>`).join('');
+        chosenSet = sets[0].id;
+        setsLoaded = true;
+        refreshStart();
+      } catch (err) {
+        $('sets').innerHTML = `<span>No se pudo cargar la lista de sets (${esc(err.message)}). ¿Está corriendo la API? <button class="opt" id="retrysets">Reintentar</button></span>`;
+        $('retrysets').onclick = loadSets;
+      }
+    }
+    $('sets').onclick = (e) => {
+      const b = e.target.closest('.opt[data-id]');
+      if (!b) return;
+      chosenSet = b.dataset.id;
+      pickIn($('sets'), b);
+    };
+    loadSets();
+
     const audio = new Audio();
+    let gameSet = 'mezcla';        // set elegido al empezar (no cambia a mitad de partida)
     const played = new Set();      // para no repetir canciones en una partida
     let pending = null;            // canción lista pero que el navegador no dejó reproducir
     let ticker = null, nextTimer = null;
@@ -130,7 +183,7 @@
     // ----- Ronda: pedir canción -> reproducir -> abrir ventana de respuestas -----
     async function fetchTrack() {
       for (let i = 0; i < 4; i++) {
-        const res = await fetch(`${API}/random-song`);
+        const res = await fetch(`${API}/random-song?set=${encodeURIComponent(gameSet)}`);
         const track = await res.json();
         if (!res.ok || track.error) throw new Error(track.error || `HTTP ${res.status}`);
         if (!played.has(track.id)) return track;
@@ -249,7 +302,8 @@
       if (msg.type === 'players') {
         $('count').textContent = msg.players.length;
         $('players').innerHTML = msg.players.map((n) => `<div class="pill">${esc(n)}</div>`).join('');
-        $('start').disabled = msg.players.length === 0;
+        playerCount = msg.players.length;
+        refreshStart();
         $('ptotal').textContent = msg.players.length;
       }
 
@@ -283,9 +337,11 @@
       // Desbloquea el audio con este clic para que las rondas siguientes puedan sonar solas
       audio.src = SILENCE;
       audio.play().catch(() => {});
-      send({ type: 'start' });
+      gameSet = chosenSet;
+      send({ type: 'start', rounds: chosenRounds });
     };
-    $('again').onclick = () => { audio.src = SILENCE; audio.play().catch(() => {}); send({ type: 'start' }); };
+    // Revancha con los mismos jugadores, mismo set y mismas rondas
+    $('again').onclick = () => { audio.src = SILENCE; audio.play().catch(() => {}); send({ type: 'start', rounds: chosenRounds }); };
   </script>
 </body>
 </html>

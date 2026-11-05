@@ -7,7 +7,8 @@ const __dirname = import.meta.dirname;
 const PORT = process.env.PORT || 3000;
 
 // Reglas del juego
-const TOTAL_ROUNDS = Number(process.env.ROUNDS) || 5;
+const DEFAULT_ROUNDS = Number(process.env.ROUNDS) || 5;
+const MAX_ROUNDS = 30;
 const GUESS_SECONDS = Number(process.env.GUESS_SECONDS) || 20;
 const MAX_POINTS = 1000;
 const POINTS_LOST_PER_YEAR = 50; // 20 años de diferencia o más = 0 puntos
@@ -76,7 +77,7 @@ const wss = new WebSocketServer({ server });
 //   host: ws,
 //   players: Map<ws, { name, score }>,
 //   phase: 'lobby' | 'between' | 'guessing' | 'over',
-//   round: number de rondas ya empezadas,
+//   round: number de rondas ya empezadas, total: rondas de la partida (las elige el host),
 //   current: { song, endsAt, guesses: Map<ws, number>, timer } | null
 // }
 const rooms = new Map();
@@ -125,7 +126,7 @@ function endRound(room) {
   }
 
   const board = leaderboard(room);
-  const last = room.round >= TOTAL_ROUNDS;
+  const last = room.round >= room.total;
   room.phase = last ? 'over' : 'between';
 
   for (const [ws, player] of room.players) {
@@ -133,7 +134,7 @@ function endRound(room) {
     send(ws, {
       type: 'round_end',
       round: room.round,
-      total: TOTAL_ROUNDS,
+      total: room.total,
       year: song.year,
       song: { name: song.name, artist: song.artist },
       guess: mine.guess,
@@ -147,7 +148,7 @@ function endRound(room) {
   send(room.host, {
     type: 'round_result',
     round: room.round,
-    total: TOTAL_ROUNDS,
+    total: room.total,
     song: { name: song.name, artist: song.artist, year: song.year },
     results: results.sort((a, b) => b.points - a.points),
     leaderboard: board,
@@ -175,7 +176,7 @@ wss.on('connection', (ws) => {
     // El anfitrión crea una sala
     if (msg.type === 'create_room') {
       const code = newCode();
-      rooms.set(code, { host: ws, players: new Map(), phase: 'lobby', round: 0, current: null });
+      rooms.set(code, { host: ws, players: new Map(), phase: 'lobby', round: 0, total: DEFAULT_ROUNDS, current: null });
       ws.role = 'host';
       ws.code = code;
       send(ws, { type: 'room_created', code });
@@ -210,17 +211,20 @@ wss.on('connection', (ws) => {
       if (!room || room.players.size === 0) return;
       if (room.phase !== 'lobby' && room.phase !== 'over') return;
       for (const p of room.players.values()) p.score = 0;
+      // El host elige cuántas rondas (1 a MAX_ROUNDS); si no manda nada se usa el valor por defecto
+      const rounds = Math.floor(Number(msg.rounds));
+      room.total = rounds >= 1 && rounds <= MAX_ROUNDS ? rounds : DEFAULT_ROUNDS;
       room.phase = 'between';
       room.round = 0;
-      broadcast(room, { type: 'started', total: TOTAL_ROUNDS });
-      send(ws, { type: 'game_started', total: TOTAL_ROUNDS, seconds: GUESS_SECONDS });
+      broadcast(room, { type: 'started', total: room.total });
+      send(ws, { type: 'game_started', total: room.total, seconds: GUESS_SECONDS });
       return;
     }
 
     // El host ya tiene la canción sonando: abre la ventana de respuestas
     if (msg.type === 'round' && ws.role === 'host') {
       const room = rooms.get(ws.code);
-      if (!room || room.phase !== 'between' || room.round >= TOTAL_ROUNDS) return;
+      if (!room || room.phase !== 'between' || room.round >= room.total) return;
       const year = Number(msg.song?.year);
       if (!Number.isInteger(year)) return;
 
@@ -234,8 +238,8 @@ wss.on('connection', (ws) => {
         timer: setTimeout(() => endRound(room), GUESS_SECONDS * 1000),
       };
       // Los jugadores NO reciben el año ni el nombre de la canción
-      broadcast(room, { type: 'round_start', round: room.round, total: TOTAL_ROUNDS, seconds: GUESS_SECONDS, endsAt, min: MIN_YEAR, max: MAX_YEAR });
-      send(ws, { type: 'round_started', round: room.round, total: TOTAL_ROUNDS, seconds: GUESS_SECONDS, endsAt });
+      broadcast(room, { type: 'round_start', round: room.round, total: room.total, seconds: GUESS_SECONDS, endsAt, min: MIN_YEAR, max: MAX_YEAR });
+      send(ws, { type: 'round_started', round: room.round, total: room.total, seconds: GUESS_SECONDS, endsAt });
       return;
     }
 
