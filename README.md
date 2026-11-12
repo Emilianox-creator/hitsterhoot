@@ -37,7 +37,7 @@ Sin cuentas ni aplicaciones que instalar para los jugadores: una dirección, un 
 - Acceso desde el navegador, sin registro de cuentas.
 - Partidas de 3, 5, 10 o 15 rondas desde la interfaz.
 - Respuestas mediante un deslizador de años y controles de ajuste.
-- Tiempo de respuesta configurable, con 20 segundos por defecto.
+- Tiempo de respuesta configurable, con 30 segundos por defecto.
 - Una respuesta por participante y ronda.
 - Finalización anticipada de la ronda cuando todos responden.
 - Puntuación calculada en el servidor según la diferencia de años.
@@ -136,7 +136,7 @@ hitsterhoot/
 - Node.js 22 o superior.
 - npm.
 - Navegador con soporte para WebSocket y reproducción de audio.
-- Conexión a internet para consultar iTunes y reproducir los fragmentos.
+- Conexión a internet para consultar iTunes, reproducir los fragmentos y cargar las tipografías de Google Fonts.
 
 ### 1. Instalar el proyecto
 
@@ -253,7 +253,7 @@ Los servicios leen las siguientes variables de entorno:
 | --- | --- | --- |
 | `PORT` | `3000` | Puerto del servidor del juego |
 | `API_PORT` | `4000` | Puerto de la API musical |
-| `GUESS_SECONDS` | `20` | Duración de la ventana de respuesta, en segundos |
+| `GUESS_SECONDS` | `30` | Duración de la ventana de respuesta, en segundos |
 | `ROUNDS` | `5` | Rondas de respaldo cuando la solicitud de inicio no incluye una selección válida |
 | `ALLOWED_ORIGIN` | Origen de la petición | Origen permitido por CORS en la API |
 
@@ -293,7 +293,7 @@ En un entorno con HTTPS, la API debe estar disponible mediante HTTPS. La conexi�
 
 ### `GET /sets`
 
-Devuelve los conjuntos musicales disponibles. Actualmente se incluye `mezcla`:
+Devuelve los conjuntos musicales disponibles (15 en total). Cada elemento trae su `id`, su nombre (`label`) y una descripción (`desc`). Ejemplo abreviado:
 
 ```json
 [
@@ -301,9 +301,34 @@ Devuelve los conjuntos musicales disponibles. Actualmente se incluye `mezcla`:
     "id": "mezcla",
     "label": "Mezcla de todo",
     "desc": "Varias décadas, mayormente en inglés"
+  },
+  {
+    "id": "indie_kids",
+    "label": "Indie Kids",
+    "desc": "Indie rock, alternative y clásicos de la escena independiente"
   }
 ]
 ```
+
+| `id` | Nombre | Tienda | Descripción |
+| --- | --- | :---: | --- |
+| `mezcla` | Mezcla de todo | US | Varias décadas, mayormente en inglés |
+| `indie_kids` | Indie Kids | US | Indie rock, alternative y clásicos de la escena independiente |
+| `hipster_anthems` | Hipster Anthems | US | Cult classics, blog-era favorites y canciones alternativas |
+| `dancefloor` | Dancefloor | US | Disco, house, electronic y pop para bailar |
+| `sad_hours` | Sad Hours | US | Melancolía, heartbreak y canciones para mirar por la ventana |
+| `latin_alternative` | Latin Alternative | MX | Rock en español, indie latino y clásicos alternativos |
+| `pop_culture` | Pop Culture | US | Grandes himnos pop que todo el mundo conoce |
+| `emo_never_dies` | Emo Never Dies | US | Emo, pop-punk, scene y rock adolescente |
+| `rap_and_rnb` | Rap & R&B | US | Hip-hop, R&B y sonidos que definieron distintas generaciones |
+| `rock_mexicano` | Rock Nacional | MX | Rock mexicano desde los clásicos hasta la nueva ola |
+| `reggaeton_y_perreo` | Perreo | MX | Reggaetón, urbano latino y hits de antro |
+| `regional_mexicano` | Regional Mexicano | MX | Banda, norteño, corridos y música para la peda |
+| `pop_mexicano` | Pop Mexicano | MX | Pop en español que sonó en todas las fiestas |
+| `mexico_indie` | Indie Mexa | MX | La escena indie mexicana, alternativa y melancólica |
+| `fiesta_mexicana` | Fiesta Mexicana | MX | Las canciones que te sabes aunque no quieras |
+
+La columna **Tienda** indica el catálogo de iTunes que se consulta (`US` o `MX`). El primer conjunto de la lista, `mezcla`, es el que aparece seleccionado por defecto en la pantalla del anfitrión.
 
 ### `GET /random-song`
 
