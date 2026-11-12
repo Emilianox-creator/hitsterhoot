@@ -118,7 +118,9 @@
 
   <script>
     // La API de canciones corre en otro puerto (server/api.js). Se puede cambiar con ?api=http://host:4000
-    const API = new URLSearchParams(location.search).get('api') || `${location.protocol}//${location.hostname}:4000`;
+    // const API = new URLSearchParams(location.search).get('api') || `${location.protocol}//${location.hostname}:4000`;
+    // For the deployed version
+    const API = new URLSearchParams(location.search).get('api') || `${location.protocol}//${location.hostname}/api`;
 
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}`);
