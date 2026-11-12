@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000;
 // Reglas del juego
 const DEFAULT_ROUNDS = Number(process.env.ROUNDS) || 5;
 const MAX_ROUNDS = 30;
-const GUESS_SECONDS = Number(process.env.GUESS_SECONDS) || 20;
+const GUESS_SECONDS = Number(process.env.GUESS_SECONDS) || 30;
 const MAX_POINTS = 1000;
 const POINTS_LOST_PER_YEAR = 50; // 20 años de diferencia o más = 0 puntos
 const MIN_YEAR = 1900;
